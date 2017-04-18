@@ -19,7 +19,7 @@ unless ($opt_f || $opt_r) {                                                     
     exit 1;
 }
 
-
+# Calls xrandr to find out the current orientation
 sub GetOrientation {
     my $regex = '\s*'.$screen.'[\s+\w+]+\s+[x+\d]+\s+(|left|right|inverted)\s*\('; # Regex parsing the output of xrandr to find the current orientation
     if (`xrandr` =~ /$regex/) {
@@ -32,7 +32,8 @@ sub GetOrientation {
     }
 }
 
-sub Flip {                                                                      # Returns supplied orientation flipped.
+# Returns supplied orientation flipped.
+sub Flip {
     unless (scalar @_ == 1) {                                                   # Subroutine needs one parameter (orientation)
         return undef;
     }
@@ -45,7 +46,8 @@ sub Flip {                                                                      
     }
 }
 
-sub Rotate {                                                                    # Returns supplied orientation rotated. Similar to Flip.
+# Returns supplied orientation rotated. Similar to Flip.
+sub Rotate {
     unless (scalar @_ == 1) {
         return undef;
     }
@@ -58,7 +60,8 @@ sub Rotate {                                                                    
     }
 }
 
-sub Matrix {                                                                    # Returns the transformation matrix required for xinput for a given orientation.
+# Returns the transformation matrix required for xinput for a given orientation.
+sub Matrix {
     unless (scalar @_ == 1) {
         return undef;
     }
@@ -70,19 +73,21 @@ sub Matrix {                                                                    
         default { return undef; }
     }
 }
-                                                                                # Begin of actual script
+
+# Beginning of actual script
 my $orientation = GetOrientation();                                             # Acquire the current orientation
 
 unless (defined $orientation) {
     exit -1;
 }
+
 if ($opt_r) {
     $orientation = Rotate($orientation);                                        # Apply the desired changes in orientation (flip or rotate) based on parameters)
 }
-
 if ($opt_f) {
     $orientation = Flip($orientation);
 }
+
 my $matrix = Matrix($orientation);                                              # Find out the transformation matrix for the desired orientation.
 my $screenstatus = `xrandr --output $screen --rotate $orientation`;             # Rotate the screen
 my $penstatus = `xinput set-prop \'$pen\' --type=float \'Coordinate Transformation Matrix\'  $matrix `;                 # Apply matrix to stylus
@@ -93,6 +98,7 @@ if ($orientation eq 'normal') {                                                 
 } else {
     $tpstatus = `xinput --disable \'$trackpoint\'`;
 }
+
 unless ($screenstatus eq "" && $penstatus eq "" && $eraserstatus eq "" && $tpstatus eq "") {                            # Exit with nonzero status if anything failed
     die;
 }
