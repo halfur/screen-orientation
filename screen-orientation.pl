@@ -21,11 +21,12 @@ unless ($opt_f || $opt_r) {                                                     
 
 # Calls xrandr to find out the current orientation
 sub GetOrientation {
-    my $regex = '\s*'.$screen.'[\s+\w+]+\s+[x+\d]+\s+(|left|right|inverted)\s*\('; # Regex parsing the output of xrandr to find the current orientation
+    # vorher war $screen die global var aus Zeile 9. Ungut, unter Umständen unsichtbare Nebeneffekte, intransparent    
+    my $scr = shift;   
+    # qr// macht beim lesen deutlich das es n regex ist. Sonst bringts in diesem Fall nix/nicht viel.
+    my $regex = qr/\s*'.$scr.'[\s+\w+]+\s+[x+\d]+\s+(|left|right|inverted)\s*\(/; # Regex parsing the output of xrandr to find the current orientation
     if (`xrandr` =~ /$regex/) {
-        unless ($1) {                                                           # $1 contains orientation or empty string if normal
-            return "normal";
-        }
+        return "normal" unless ($1);                # Stilfrage, ich mag dieses kompakte Format.
         return $1;
     } else {
         return undef;
@@ -34,64 +35,60 @@ sub GetOrientation {
 
 # Returns supplied orientation flipped.
 sub Flip {
-    unless (scalar @_ == 1) {                                                   # Subroutine needs one parameter (orientation)
-        return undef;
-    }
+    # Stilfrage, kompaktes Format...
+    return undef unless (defined( $_[0]);                                       # Subroutine needs one parameter (orientation)
+
     given ($_[0]) {                                                             # Apply flip. Returns undef if unknown orientation was given.
-        when ('normal') { return 'inverted'; }
-        when ('left') { return 'right'; }
+        when ('normal')   { return 'inverted'; }
+        when ('left')     { return 'right'; }
         when ('inverted') { return 'normal'; }
-        when ('right') { return 'left'; }
-        default { return undef; }
+        when ('right')    { return 'left'; }
+        default           { return undef; }
     }
 }
 
 # Returns supplied orientation rotated. Similar to Flip.
 sub Rotate {
-    unless (scalar @_ == 1) {
-        return undef;
-    }
+    # Stilfrage, kompaktes Format...
+    return undef unless (defined($_[0]));
+    
     given ($_[0]) {
-        when ('normal') { return 'left'; }
-        when ('left') { return 'inverted'; }
+        when ('normal')   { return 'left'; }
+        when ('left')     { return 'inverted'; }
         when ('inverted') { return 'right'; }
-        when ('right') { return 'normal'; }
-        default { return undef; }
+        when ('right')    { return 'normal'; }
+        default           { return undef; }
     }
 }
 
 # Returns the transformation matrix required for xinput for a given orientation.
 sub Matrix {
-    unless (scalar @_ == 1) {
-        return undef;
-    }
+    # Stilfrage, kompaktes Format...
+    return undef unless (defined($_[0]));
+
     given ($_[0]) {
-        when ('normal') { return '1 0 0 0 1 0 0 0 1'; }
-        when ('left') { return '0 -1 1 1 0 0 0 0 1'; }
-        when ('inverted') { return '-1 0 1 0 -1 1 0 0 1'; }
-        when ('right') { return '0 1 0 -1 0 1 0 0 1'; }
-        default { return undef; }
+        when ('normal')   { return ' 1  0  0  0  1  0  0  0  1'; }
+        when ('left')     { return ' 0 -1  1  1  0  0  0  0  1'; }
+        when ('inverted') { return '-1  0  1  0 -1  1  0  0  1'; }
+        when ('right')    { return ' 0  1  0 -1  0  1  0  0  1'; }
+        default           { return undef; }
     }
 }
 
 # Beginning of actual script
-my $orientation = GetOrientation();                                             # Acquire the current orientation
+my $orientation = GetOrientation( $screen );                                    # Acquire the current orientation
 
-unless (defined $orientation) {
-    exit -1;
-}
+exit -1 unless (defined $orientation);
 
-if ($opt_r) {
-    $orientation = Rotate($orientation);                                        # Apply the desired changes in orientation (flip or rotate) based on parameters)
-}
-if ($opt_f) {
-    $orientation = Flip($orientation);
-}
+$orientation = Rotate($orientation) if ($opt_r);                                # Apply the desired changes in orientation (flip or rotate) based on parameters)
+$orientation = Flip($orientation)   if ($opt_f);
+
 
 my $matrix = Matrix($orientation);                                              # Find out the transformation matrix for the desired orientation.
 my $screenstatus = `xrandr --output $screen --rotate $orientation`;             # Rotate the screen
-my $penstatus = `xinput set-prop \'$pen\' --type=float \'Coordinate Transformation Matrix\'  $matrix `;                 # Apply matrix to stylus
+my $penstatus    = `xinput set-prop \'$pen\' --type=float \'Coordinate Transformation Matrix\'  $matrix `;                 # Apply matrix to stylus
 my $eraserstatus = `xinput set-prop \'$eraser\' --type=float \'Coordinate Transformation Matrix\' $matrix`;             # Apply matrix to eraser
+
 my $tpstatus;
 if ($orientation eq 'normal') {                                                                                         # Disable or enable Trackpoint
     $tpstatus = `xinput --enable \'$trackpoint\'`;
@@ -100,6 +97,7 @@ if ($orientation eq 'normal') {                                                 
 }
 
 unless ($screenstatus eq "" && $penstatus eq "" && $eraserstatus eq "" && $tpstatus eq "") {                            # Exit with nonzero status if anything failed
-    die;
+    die 'with some meaningful message, maybe?';
 }
+
 exit 0;
